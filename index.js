@@ -4,6 +4,8 @@ const path = require("path");
 const { exec } = require("child_process");
 const bodyParser = require("body-parser");
 const multer = require("multer");
+const concat = require("ffmpeg-concat");
+const glob = require("glob");
 
 let list = "";
 
@@ -29,7 +31,7 @@ const storage = multer.diskStorage({
   filename: function (req, file, cb) {
     cb(
       null,
-      file.fieldname + "-" + currentTime + path.extname(file.originalname)
+      file.fieldname + "-" + Date.now() + path.extname(file.originalname)
     );
   },
 });
@@ -55,7 +57,7 @@ app.get("/", (req, res) => {
   res.sendFile(__dirname + "/src/index.html");
 });
 
-app.post("/merge", upload.array("files", 1000), (req, res) => {
+app.post("/merge", upload.array("files", 1000), async (req, res) => {
   if (!req.files) {
     res.send(400).json({ message: "No files found!" });
     return;
@@ -72,32 +74,30 @@ app.post("/merge", upload.array("files", 1000), (req, res) => {
 
   writeStream.end();
 
-  exec(
-    `ffmpeg -safe 0 -f concat -i ${listFilePath} -c copy ${outputFileName}`,
-    (error, stdout, stderr) => {
-      if (error) {
-        console.log(`error: ${error.message}`);
-        return;
-      } else {
-        console.log("videos are successfully merged");
+  const videos = glob.sync("public/uploads/*.mp4");
 
-        res
-          .status(200)
-          .sendFile(
-            path.join(__dirname + `/${outputFileName}`),
-            function (err) {
-              if (err) throw err;
-              req.files.forEach((file) => {
-                fs.unlinkSync(file.path);
-              });
+  await concat({
+    output: outputFileName,
+    videos,
+    transition: {
+      name: "fadegrayscale",
+      duration: 500,
+    },
+  });
 
-              fs.unlinkSync(listFilePath);
-              fs.unlinkSync(outputFileName);
-            }
-          );
-      }
-    }
-  );
+  console.log("videos are successfully merged");
+
+  res
+    .status(200)
+    .sendFile(path.join(__dirname + `/${outputFileName}`), function (err) {
+      if (err) throw err;
+      req.files.forEach((file) => {
+        fs.unlinkSync(file.path);
+      });
+
+      fs.unlinkSync(listFilePath);
+      fs.unlinkSync(outputFileName);
+    });
 });
 
 app.post("/trim", upload.array("files", 1), (req, res) => {
