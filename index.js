@@ -1,11 +1,13 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-const { exec } = require("child_process");
 const bodyParser = require("body-parser");
 const multer = require("multer");
 const concat = require("ffmpeg-concat");
 const glob = require("glob");
+const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path;
+const ffmpeg = require("fluent-ffmpeg");
+ffmpeg.setFfmpegPath(ffmpegPath);
 
 let list = "";
 
@@ -23,7 +25,6 @@ if (!fs.existsSync(dir)) {
 
   fs.mkdirSync(subDirectory);
 }
-const currentTime = Date.now();
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "public/uploads");
@@ -51,7 +52,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(express.static("public"));
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 console.log("__dirname", __dirname);
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/src/index.html");
@@ -106,23 +107,14 @@ app.post("/trim", upload.array("files", 1), (req, res) => {
     return;
   }
 
-  const file = req.files[0];
+  const videos = glob.sync("public/uploads/*.mp4");
 
-  const fileName =
-    file.fieldname + "-" + currentTime + path.extname(file.originalname);
-
-  exec(
-    // `ffmpeg -ss 00:00:02 -to 00:00:10 -i ${subDirectory}/${fileName} -c copy ${outputFileName}`,
-    `ffmpeg -i ${subDirectory}/${fileName} \
-    -vf "select='between(t,2,3.5)+between(t,5,6)',
-         setpts=N/FRAME_RATE/TB" \
-    -af "aselect='between(t,2,3.5)+between(t,5,8)',
-         asetpts=N/SR/TB" ${outputFileName}`,
-    (error, stdout, stderr) => {
-      if (error) {
-        console.log(`error: ${error.message}`);
-        return;
-      } else {
+  ffmpeg(videos[0])
+    .setStartTime("00:00:05")
+    .setDuration(5)
+    .output(outputFileName)
+    .on("end", function (err) {
+      if (!err) {
         console.log("video is trimmed successfully");
 
         res
@@ -139,13 +131,14 @@ app.post("/trim", upload.array("files", 1), (req, res) => {
             }
           );
       }
-    }
-  );
+    })
+    .on("error", function (err) {
+      console.log("error: ", err);
+    })
+    .run();
 });
 
-app.post("/thumbnail", upload.array("files", 1), (req, res) => {
-  
-})
+app.post("/thumbnail", upload.array("files", 1), (req, res) => {});
 
 app.listen(PORT, () => {
   console.log(`App is listening on Port ${PORT}`);
