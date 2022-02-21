@@ -157,7 +157,7 @@ app.post("/addCaptions", uploadAnyfile.array("files", 2), (req, res) => {
     .save(outputFileName)
     .on("end", function (err) {
       if (!err) {
-        console.log("video is trimmed successfully");
+        console.log("caption added successfully");
 
         res
           .status(200)
