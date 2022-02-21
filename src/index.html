@@ -49,6 +49,37 @@
           </button>
         </div>
       </form>
+
+      <h1 class="text-center">Add Captions</h1>
+      <div id="add-captions"></div>
+      <div id="add-captions-output"></div>
+      <form validate>
+        <div class="form-group">
+          <label for="files" class="btn">Select Video :</label>
+          <input
+            id="video-captions-input"
+            type="file"
+            name="files"
+            required
+            class="form-control"
+          />
+          <br/>
+          <label for="files" class="btn">Select Subtitles :</label>
+          <input
+            id="captions-input"
+            type="file"
+            name="files"
+            required
+            class="form-control"
+            accept=".srt"
+          />
+        </div>
+        <div class="form-group">
+          <button type="submit" id="add-captions-button" class="btn btn-danger">
+            Add Captions
+          </button>
+        </div>
+      </form>
     </div>
   </body>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
@@ -66,13 +97,20 @@
       showVideos(e, trimVideoWrapper)
     );
 
+    const captionsWrapper = document.getElementById("add-captions");
+    const videocaptionsInput = document.getElementById("video-captions-input");
+    videocaptionsInput.addEventListener("change", (e) =>
+      showVideos(e, captionsWrapper)
+    );
+
     const mergeVideoBtn = document.getElementById("merge-video-button");
     mergeVideoBtn.addEventListener("click", mergeVideos);
 
     const trimVideoBtn = document.getElementById("trim-video-button");
     trimVideoBtn.addEventListener("click", trimVideos);
 
-    
+    const captionsBtn = document.getElementById("add-captions-button");
+    captionsBtn.addEventListener("click", addCaptions);    
 
     let formData = new FormData();
 
@@ -146,6 +184,41 @@
 
       const data = await response.blob();
       const outputVideoWrapper = document.getElementById("trim-video-output");
+      // append video to the DOM
+      const outputVideoEle = document.createElement("video");
+      outputVideoEle.style.margin = "10px";
+      outputVideoEle.src = URL.createObjectURL(data);
+      outputVideoEle.width = 320;
+      outputVideoEle.height = 240;
+      outputVideoEle.controls = true;
+      outputVideoWrapper.appendChild(outputVideoEle);
+    }
+
+    async function addCaptions(e) {
+      e.preventDefault();
+      const captionsInput = document.getElementById("captions-input");
+      const { files } = captionsInput;
+
+      // If data doesn't exists, return
+      if (!formData.has("files") || !files.length) {
+        return;
+      }
+
+      formData.append("files", files[0]);
+
+      const response = await fetch("/addCaptions", {
+        method: "POST",
+        mode: "cors",
+        cache: "no-cache",
+        credentials: "same-origin",
+        redirect: "follow",
+        referrerPolicy: "no-referrer",
+        body: formData,
+      });
+
+      const data = await response.blob();
+
+      const outputVideoWrapper = document.getElementById("add-captions-output");
       // append video to the DOM
       const outputVideoEle = document.createElement("video");
       outputVideoEle.style.margin = "10px";

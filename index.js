@@ -47,12 +47,13 @@ const videoFilter = function (req, file, cb) {
 };
 
 var upload = multer({ storage: storage, fileFilter: videoFilter });
+var uploadAnyfile = multer({ storage: storage });
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(express.static("public"));
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 console.log("__dirname", __dirname);
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/src/index.html");
@@ -136,6 +137,43 @@ app.post("/trim", upload.array("files", 1), (req, res) => {
       console.log("error: ", err);
     })
     .run();
+});
+
+app.post("/addCaptions", uploadAnyfile.array("files", 2), (req, res) => {
+  if (!req.files) {
+    res.send(400).json({ message: "No files found!" });
+    return;
+  }
+
+  const videos = glob.sync("public/uploads/*.mp4");
+  const srts = glob.sync("public/uploads/*.srt");
+  console.log({ videos, srts });
+
+  ffmpeg(videos[0])
+    .outputOptions("-vf subtitles=" + srts[0])
+    .on("error", function (err) {
+      console.log("Error: " + err.message);
+    })
+    .save(outputFileName)
+    .on("end", function (err) {
+      if (!err) {
+        console.log("video is trimmed successfully");
+
+        res
+          .status(200)
+          .sendFile(
+            path.join(__dirname + `/${outputFileName}`),
+            function (err) {
+              if (err) throw err;
+              req.files.forEach((file) => {
+                fs.unlinkSync(file.path);
+              });
+
+              fs.unlinkSync(outputFileName);
+            }
+          );
+      }
+    });
 });
 
 app.post("/thumbnail", upload.array("files", 1), (req, res) => {});
