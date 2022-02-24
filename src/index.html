@@ -6,6 +6,10 @@
       rel="stylesheet"
       href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
     />
+    <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.7.0/nouislider.css"
+  />
   </head>
   <body>
     <div class="container">
@@ -32,6 +36,43 @@
 
       <h1 class="text-center">Trim Video</h1>
       <div id="trim-video"></div>
+      <div id="trim-video-container" class="container my-4 d-none">
+        <div class="row">
+          <div class="col-12">
+            <div class="card shadow">
+              <div class="card-header">
+                <h2 class="text-center">Trim your video</h2>
+              </div>
+              <div class="card-body px-4">
+                <div class="row">
+                  <div class="col-6">
+                    <img id="thumbnail-start" class="img-fluid" src="" width="100%" alt="video thumbnail">
+                  </div>
+                  <div class="col-6">
+                    <img id="thumbnail-finish" class="img-fluid" src="" width="100%" alt="video thumbnail">
+                  </div>
+                </div>
+                <div class="row text-center mt-3">
+                  <div class="col-6">
+                    <p>Start: <code><span class="start">00:00:01</span></code></p>
+                  </div>
+                  <div class="col-6">
+                    <p>Finish: <code><span class="finish">00:00:30</span></code></p>
+                  </div>
+                </div>
+                <div class="row text-center mt-4 px-4">
+                  <div id="slider" class="w-100"></div>
+                </div>
+                <div class="row text-center mt-3">
+                  <div class="col-12">
+                    <div id="trim-video-images"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div id="trim-video-output"></div>
       <form validate>
         <div class="form-group">
@@ -44,7 +85,10 @@
           />
         </div>
         <div class="form-group">
-          <button type="submit" id="trim-video-button" class="btn btn-danger">
+          <button type="submit" id="thumbnails-button" class="btn btn-danger">
+            Get Thumbnails
+          </button>
+          <button type="submit" id="trim-video-button" class="btn btn-danger" style="visibility:hidden">
             Trim Video
           </button>
         </div>
@@ -82,6 +126,7 @@
       </form>
     </div>
   </body>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.7.0/nouislider.min.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
   <script>
     const videoWrapper = document.getElementById("videos");
@@ -106,11 +151,11 @@
     const mergeVideoBtn = document.getElementById("merge-video-button");
     mergeVideoBtn.addEventListener("click", mergeVideos);
 
-    const trimVideoBtn = document.getElementById("trim-video-button");
-    trimVideoBtn.addEventListener("click", trimVideos);
-
     const captionsBtn = document.getElementById("add-captions-button");
     captionsBtn.addEventListener("click", addCaptions);    
+
+    const thumbnailsBtn = document.getElementById("thumbnails-button");
+    thumbnailsBtn.addEventListener("click", getThumbnails);    
 
     let formData = new FormData();
 
@@ -163,37 +208,6 @@
       outputVideoWrapper.appendChild(outputVideoEle);
     }
 
-    async function trimVideos(e) {
-      e.preventDefault();
-
-      // If data doesn't exists, return
-      if (!formData.has("files")) {
-        return;
-      }
-      console.log("formData", formData);
-
-      const response = await fetch("/trim", {
-        method: "POST",
-        mode: "cors",
-        cache: "no-cache",
-        credentials: "same-origin",
-        redirect: "follow",
-        referrerPolicy: "no-referrer",
-        body: formData,
-      });
-
-      const data = await response.blob();
-      const outputVideoWrapper = document.getElementById("trim-video-output");
-      // append video to the DOM
-      const outputVideoEle = document.createElement("video");
-      outputVideoEle.style.margin = "10px";
-      outputVideoEle.src = URL.createObjectURL(data);
-      outputVideoEle.width = 920;
-      outputVideoEle.height = 540;
-      outputVideoEle.controls = true;
-      outputVideoWrapper.appendChild(outputVideoEle);
-    }
-
     async function addCaptions(e) {
       e.preventDefault();
       const captionsInput = document.getElementById("captions-input");
@@ -227,6 +241,146 @@
       outputVideoEle.height = 540;
       outputVideoEle.controls = true;
       outputVideoWrapper.appendChild(outputVideoEle);
+    }
+    function getSeconds(time) {
+      const [hours, minutes, seconds] = time.split(":");
+        const totalSeconds = +hours * 60 * 60 + +minutes * 60 + +seconds;
+        return totalSeconds
+    }
+
+    async function getThumbnails(e) {
+      e.preventDefault();
+      if (!formData.has("files")) {
+        return;
+      }
+
+      const response = await fetch("/allThumbnails", {
+        method: "POST",
+        mode: "cors",
+        cache: "no-cache",
+        credentials: "same-origin",
+        redirect: "follow",
+        referrerPolicy: "no-referrer",
+        body: formData,
+      });
+
+      const data = await response.json();
+      const paths = data.paths.map(e => e.split('/').slice(1).join('/'))
+
+      const outputImagesWrapper = document.getElementById("trim-video-images");
+      const container = document.getElementById("trim-video-container");
+      container.classList.add("d-block")
+
+      $("#thumbnail-start").attr("src", paths[0]);
+      $("#thumbnail-finish").attr("src", paths.slice(-1)[0]);
+
+      const trimVideo = document.getElementById("trim-video");
+      const duration = Math.floor(trimVideo.firstChild.duration);
+
+      // // append video to the DOM
+      paths.map(e => {
+        const img = document.createElement("img");
+        img.src = e
+        img.width = 100;
+        img.height = 80;
+        outputImagesWrapper.appendChild(img);
+      })
+
+      let slider = document.getElementById("slider");
+
+      noUiSlider.create(slider, {
+        start: [0, duration],
+        connect: true,
+        step: 1,
+        range: {
+          min: 0,
+          max: duration
+        }
+      });
+
+      let start_element = document.getElementsByClassName("start");
+      let finish_element = document.getElementsByClassName("finish");
+      finish_element[0].innerHTML = new Date((duration) * 1000)
+          .toISOString()
+          .substr(11, 8);
+
+      slider.noUiSlider.on("change", function (values, handle) {
+        let old_start = start_element[0].innerHTML;
+        let old_finish = finish_element[0].innerHTML;
+        let slider_values = slider.noUiSlider.get();
+        let start_string = new Date(slider_values[0] * 1000)
+          .toISOString()
+          .substr(11, 8);
+        let finish_string = new Date(slider_values[1] * 1000)
+          .toISOString()
+          .substr(11, 8);
+        let duration = new Date((slider_values[1] - slider_values[0]) * 1000)
+          .toISOString()
+          .substr(11, 8);
+        start_element[0].innerHTML = start_string;
+        finish_element[0].innerHTML = finish_string;
+        if (old_start !== start_string) {
+          createThumb(start_string, "start");
+        }
+        if (old_finish !== finish_string) {
+          createThumb(finish_string, "finish");
+        }
+      });
+
+      async function createThumb(time, type) {
+        let form = new FormData();
+        form.set("time", time);
+        const response = await fetch("/thumbnail", {
+          method: "POST",
+          mode: "cors",
+          cache: "no-cache",
+          credentials: "same-origin",
+          redirect: "follow",
+          referrerPolicy: "no-referrer",
+          body: form,
+        });
+
+        const data = await response.json();
+        const path = data.path.split('/').slice(1).join('/')
+
+        if (type === "start") {
+          $("#thumbnail-start").attr("src", path);
+        } else {
+          $("#thumbnail-finish").attr("src", path);
+        }
+      }
+
+      const trimVideoBtn = document.getElementById("trim-video-button");
+      trimVideoBtn.addEventListener("click", trimVideos);
+      trimVideoBtn.classList.add("visible")
+
+      async function trimVideos(e) {
+        e.preventDefault();
+        let duration = getSeconds(finish_element[0].innerHTML) - getSeconds(start_element[0].innerHTML)
+        let form = new FormData();
+        form.set("starttime", start_element[0].innerHTML);
+        form.set("duration", duration < 1 ? 1 : duration);
+        const response = await fetch("/trim", {
+          method: "POST",
+          mode: "cors",
+          cache: "no-cache",
+          credentials: "same-origin",
+          redirect: "follow",
+          referrerPolicy: "no-referrer",
+          body: form,
+        });
+
+        const data = await response.blob();
+        const outputVideoWrapper = document.getElementById("trim-video-output");
+        // append video to the DOM
+        const outputVideoEle = document.createElement("video");
+        outputVideoEle.style.margin = "10px";
+        outputVideoEle.src = URL.createObjectURL(data);
+        outputVideoEle.width = 920;
+        outputVideoEle.height = 540;
+        outputVideoEle.controls = true;
+        outputVideoWrapper.appendChild(outputVideoEle);
+      }
     }
   </script>
 </html>
