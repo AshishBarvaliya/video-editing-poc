@@ -124,6 +124,29 @@
           </button>
         </div>
       </form>
+
+      <h1 class="text-center">Overlay Text</h1>
+      <div id="overlay-video">
+        <div id="white-overlay" style="position: absolute;height: 470px;width: 920px;display: none;z-index: 3;">
+      </div>
+      </div>
+      <div id="overlay-video-output"></div>
+      <form validate>
+        <div class="form-group">
+          <input
+            id="overlay-video-input"
+            type="file"
+            name="files"
+            required
+            class="form-control"
+          />
+        </div>
+        <div class="form-group">
+          <button type="submit" id="overlay-video-button" class="btn btn-danger">
+            Overlay Video
+          </button>
+        </div>
+      </form>
     </div>
   </body>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.7.0/nouislider.min.js"></script>
@@ -157,19 +180,81 @@
     const thumbnailsBtn = document.getElementById("thumbnails-button");
     thumbnailsBtn.addEventListener("click", getThumbnails);    
 
-    let formData = new FormData();
+    var formData = new FormData();
 
-    function showVideos(e, wrapper) {
+    const overlayVieodWrapper = document.getElementById("overlay-video");
+    const overlayVideosInput = document.getElementById("overlay-video-input");
+    const whiteOverlay = document.getElementById("white-overlay");
+    overlayVideosInput.addEventListener("change", (e) => {
+      showVideos(e, overlayVieodWrapper, 920, 540, "0px");
+      let button = document.createElement("button");
+      button.id = "add-text-button";
+      button.innerHTML = "Add text";
+      button.style.marginLeft = "10px";
+      overlayVieodWrapper.appendChild(button);
+
+      let addTextButton = document.getElementById("add-text-button");
+        addTextButton && addTextButton.addEventListener("click", () => {
+          whiteOverlay.classList.add("d-block");
+        });
+    });
+    whiteOverlay.addEventListener("click", (e) => {
+      if(whiteOverlay.children.length === 0) {
+        formData.set("offsetX", Math.floor(e.offsetX*1280 / 920));
+        formData.set("offsetY", Math.floor(e.offsetY*720 / 540));
+        let form = document.createElement("form");
+        let input = document.createElement("input");
+        let button = document.createElement("button");
+        input.id = "overlay-addtext-input";
+        input.name = "overlay-addtext-input";
+        button.innerHTML = "Submit";
+        button.type = "submit";
+        button.id = "overlay-addtext-button";
+        form.style.position = "absolute";
+        form.style.marginLeft = e.offsetX + "px";
+        form.style.marginTop = e.offsetY + "px";
+        form.style.zIndex = 5;
+        form.id = "text-form";
+        form.appendChild(input);
+        form.appendChild(button);
+        whiteOverlay.appendChild(form);
+
+        let addTextSubmit = document.getElementById("overlay-addtext-button");
+        addTextSubmit && addTextSubmit.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            let text = document.getElementById("overlay-addtext-input");
+            if(text.value !== "") {
+              formData.set("text", text.value);
+              let textForm = document.getElementById("text-form");
+              textForm.classList.add("d-none");
+
+              let div = document.createElement("div");
+              div.innerHTML= text.value;
+              div.style.position = "absolute";
+              div.style.marginLeft = e.offsetX + "px";
+              div.style.marginTop = e.offsetY + "px";
+              div.style.fontSize = "30px";
+              div.style.zIndex = 7;
+              whiteOverlay.appendChild(div);
+            }
+        });
+      }
+    });
+
+    const overlayVideoBtn = document.getElementById("overlay-video-button");
+    overlayVideoBtn.addEventListener("click", overlayVideos);
+
+    function showVideos(e, wrapper, width = 320, height = 240, margin = "10px") {
       e.preventDefault();
       const { files } = e.target;
       for (let file of files) {
         const blobURL = URL.createObjectURL(file);
 
         const videoEle = document.createElement("video");
-        videoEle.style.margin = "10px";
+        videoEle.style.margin = margin;
         videoEle.src = blobURL;
-        videoEle.width = 320;
-        videoEle.height = 240;
+        videoEle.width = width;
+        videoEle.height = height;
         videoEle.controls = true;
         wrapper.appendChild(videoEle);
         formData.append("files", file);
@@ -381,6 +466,36 @@
         outputVideoEle.controls = true;
         outputVideoWrapper.appendChild(outputVideoEle);
       }
+    }
+
+    async function overlayVideos(e) {
+      e.preventDefault();
+
+      // If data doesn't exists, return
+      if (!formData.has("files")) {
+        return;
+      }
+      console.log("formData", formData);
+
+      const response = await fetch("/addOverlay", {
+        method: "POST",
+        mode: "cors",
+        cache: "no-cache",
+        credentials: "same-origin",
+        redirect: "follow",
+        referrerPolicy: "no-referrer",
+        body: formData,
+      });
+
+      const data = await response.blob();
+      const outputVideoWrapper = document.getElementById("overlay-video-output");
+      // append video to the DOM
+      const outputVideoEle = document.createElement("video");
+      outputVideoEle.src = URL.createObjectURL(data);
+      outputVideoEle.width = 920;
+      outputVideoEle.height = 540;
+      outputVideoEle.controls = true;
+      outputVideoWrapper.appendChild(outputVideoEle);
     }
   </script>
 </html>

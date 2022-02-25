@@ -255,6 +255,56 @@ app.post("/thumbnail", uploadToTrim.array("files", 0), (req, res) => {
     });
 });
 
+app.post("/addOverlay", upload.array("files", 1), (req, res) => {
+  if (!req.files || !req.body.text || !req.body.offsetX || !req.body.offsetY) {
+    res.send(400).json({ message: "No data found!" });
+    return;
+  }
+  console.log(req.body)
+  const videos = glob.sync("public/uploads/*.mp4");
+
+  ffmpeg(videos[0])
+    .videoFilters({
+      filter: 'drawtext',
+      options: {
+        text: req.body.text,
+        fontsize: 40,
+        fontcolor: 'black',
+        x: req.body.offsetX,
+        y: req.body.offsetY,
+        // shadowcolor: 'black',
+        // shadowx: 2,
+        // shadowy: 2,
+        boxcolor: "white@0.7",
+        box: 1,
+        boxborderw: 5,
+      }
+    })
+    .on("error", function (err) {
+      console.log("Error: " + err.message);
+    })
+    .save(outputFileName)
+    .on("end", function (err) {
+      if (!err) {
+        console.log("text added successfully");
+
+        res
+          .status(200)
+          .sendFile(
+            path.join(__dirname + `/${outputFileName}`),
+            function (err) {
+              if (err) throw err;
+              req.files.forEach((file) => {
+                fs.unlinkSync(file.path);
+              });
+
+              fs.unlinkSync(outputFileName);
+            }
+          );
+      }
+    });
+});
+
 app.listen(PORT, () => {
   console.log(`App is listening on Port ${PORT}`);
 });
